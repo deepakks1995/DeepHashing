@@ -42,7 +42,7 @@ class Variables(object):
 		range_allowed 	= 	[ (pri_index+i)%self.total_images for i in xrange((int)(0.005*self.total_images) )] \
 						+ 	[(sec_index+i)%self.total_images for i in xrange((int)(0.005*self.total_images) )]
 		
-		for index in [pri_index, sec_index]:
+		for index in range_allowed:
 
 			Q = tf.subtract( tf.scalar_mul(-2*self.kbit,	\
 				tf.add(tf.matmul(self.similarity_matrix, self.U, transpose_a=True, transpose_b=True),	\
@@ -54,18 +54,16 @@ class Variables(object):
 			U_star_c =	tf.reshape(self.U[:, (index)], [self.kbit, 1] )
 			V_star_c =	tf.reshape(self.V[:, (index)], [self.kbit, 1] )
 			
-			self.U = tf.concat( [ self.U[:, 0:index], self.U[:, index+1: self.total_images]] , axis=1)
-			self.V = tf.concat( [ self.V[:, 0:index], self.V[:, index+1: self.total_images]] , axis=1)
+			U_temp = tf.concat( [ self.U[:, 0:index], self.U[:, index+1: self.total_images]] , axis=1)
+			V_temp = tf.concat( [ self.V[:, 0:index], self.V[:, index+1: self.total_images]] , axis=1)
 			self.B = tf.concat( [ self.B[:, 0:index], self.B[:, index+1: self.total_images]] , axis=1)
 
 			B_star_c =	tf.scalar_mul(-1, \
 						tf.sign(tf.add(tf.matmul(tf.scalar_mul(2, self.B), \
-						tf.add(tf.matmul(self.U, U_star_c, transpose_a=True), tf.matmul(self.V, V_star_c, transpose_a=True)) ) , Q_star_c)) )
+						tf.add(tf.matmul(U_temp, U_star_c, transpose_a=True), tf.matmul(V_temp, V_star_c, transpose_a=True)) ) , Q_star_c)) )
 
-			self.U = tf.concat( [ self.U[:, 0:index], tf.concat( [U_star_c, self.U[:, index:self.total_images]], axis=1)], axis=1)
-			self.V = tf.concat( [ self.V[:, 0:index], tf.concat( [V_star_c, self.V[:, index:self.total_images]], axis=1)], axis=1)
 			self.B = tf.concat( [ self.B[:, 0:index], tf.concat( [B_star_c, self.B[:, index:self.total_images]], axis=1)], axis=1)
 			
-			del Q_star_c, U_star_c, V_star_c, B_star_c, Q
+			del Q_star_c, U_star_c, V_star_c, B_star_c, Q, U_temp, V_temp
 		del range_allowed, pri_index, sec_index
 		return 0	
