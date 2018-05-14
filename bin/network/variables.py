@@ -16,15 +16,14 @@ class Variables(object):
  		self.__init_vars()
 
  	def __init_vars(self):
-		self.B = tf.Variable(np.full((self.kbit, self.total_images), 0, dtype=float), dtype=tf.float32, name="Binary_Codes")
-		self.U = tf.Variable(np.full((self.kbit, self.total_images), 0, dtype=float), dtype=tf.float32, name="Primary_Hash")
-		self.V = tf.Variable(np.full((self.kbit, self.total_images), 0, dtype=float), dtype=tf.float32, name="Secondary_Hash")
+		self.B = np.full((self.kbit, self.total_images), 0, dtype=float)
+		self.U = np.full((self.kbit, self.total_images), 0, dtype=float)
+		self.V = np.full((self.kbit, self.total_images), 0, dtype=float)
 		self.similarity_matrix = np.full((self.total_images, self.total_images), -1, dtype=int)
 				
 		for i in xrange(self._length):
 			for j in xrange(self._samples):
 				self.similarity_matrix[i][i*self._samples + j] = 1
-		self.similarity_matrix = tf.Variable(self.similarity_matrix, dtype=tf.float32, name="Similarity_Matrix")
 		
 		self.pri_tensor = Input(tensor=tf.zeros(shape=self.kbit, dtype=tf.float32))
 		self.sec_tensor = Input(tensor=tf.zeros(shape=self.kbit, dtype=tf.float32))
