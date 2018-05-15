@@ -8,7 +8,7 @@ class BinaryManager(object):
  	def _add_items(self, item):
  		string = ''
  		for itr in item:
- 			if itr == -1:
+ 			if itr < 0:
  				string += '0'
  			else:
  				string += '1'
