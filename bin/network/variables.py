@@ -31,8 +31,8 @@ class Variables(object):
  
  	def _change_B(self, prim_index1=0, prim_index2=0, sec_index1=0, sec_index2=0):
  		del self.pri_tensor, self.sec_tensor
- 		self.pri_tensor = Input(tensor=self.B[:, (prim_index1*self._samples) + prim_index2] )
-		self.sec_tensor = Input(tensor=self.B[:, (sec_index1*self._samples) + sec_index2] )	
+ 		self.pri_tensor = Input(tensor=tf.Variable(self.B[:, (prim_index1*self._samples) + prim_index2], dtype=tf.float32) )
+		self.sec_tensor = Input(tensor=tf.Variable(self.B[:, (sec_index1*self._samples) + sec_index2] ), dtype=tf.float32)	
 
 	def _calculate_binary(self, model, variable):
 
@@ -43,25 +43,22 @@ class Variables(object):
 		
 		for index in range_allowed:
 
-			Q = tf.subtract( tf.scalar_mul(-2*self.kbit,	\
-				tf.add(tf.matmul(self.similarity_matrix, self.U, transpose_a=True, transpose_b=True),	\
-				tf.matmul(self.similarity_matrix, self.V, transpose_a=True, transpose_b=True) ) ),	\
-				tf.scalar_mul(-2*self.gamma,(tf.add(tf.transpose(self.U), tf.transpose(self.V)))) )
+			Q = -2*self.kbit*(np.dot(self.similarity_matrix.transpose(), self.U.transpose()) + np.dot(self.similarity_matrix.transpose(), self.V.transpose()))	\
+				-2*self.gamma*(self.U.transpose() + self.V.transpose())
+
+			# Q_star_c =	tf.reshape(tf.transpose(Q)[:, (index)], [self.kbit, 1] )
+			# U_star_c =	tf.reshape(self.U[:, (index)], [self.kbit, 1] )
+			# V_star_c =	tf.reshape(self.V[:, (index)], [self.kbit, 1] )
 			
+			# U_temp = tf.concat( [ self.U[:, 0:index], self.U[:, index+1: self.total_images]] , axis=1)
+			# V_temp = tf.concat( [ self.V[:, 0:index], self.V[:, index+1: self.total_images]] , axis=1)
+			# self.B = tf.concat( [ self.B[:, 0:index], self.B[:, index+1: self.total_images]] , axis=1)
 
-			Q_star_c =	tf.reshape(tf.transpose(Q)[:, (index)], [self.kbit, 1] )
-			U_star_c =	tf.reshape(self.U[:, (index)], [self.kbit, 1] )
-			V_star_c =	tf.reshape(self.V[:, (index)], [self.kbit, 1] )
-			
-			U_temp = tf.concat( [ self.U[:, 0:index], self.U[:, index+1: self.total_images]] , axis=1)
-			V_temp = tf.concat( [ self.V[:, 0:index], self.V[:, index+1: self.total_images]] , axis=1)
-			self.B = tf.concat( [ self.B[:, 0:index], self.B[:, index+1: self.total_images]] , axis=1)
+			# B_star_c =	tf.scalar_mul(-1, \
+			# 			tf.sign(tf.add(tf.matmul(tf.scalar_mul(2, self.B), \
+			# 			tf.add(tf.matmul(U_temp, U_star_c, transpose_a=True), tf.matmul(V_temp, V_star_c, transpose_a=True)) ) , Q_star_c)) )
 
-			B_star_c =	tf.scalar_mul(-1, \
-						tf.sign(tf.add(tf.matmul(tf.scalar_mul(2, self.B), \
-						tf.add(tf.matmul(U_temp, U_star_c, transpose_a=True), tf.matmul(V_temp, V_star_c, transpose_a=True)) ) , Q_star_c)) )
-
-			self.B = tf.concat( [ self.B[:, 0:index], tf.concat( [B_star_c, self.B[:, index:self.total_images]], axis=1)], axis=1)
+			# self.B = tf.concat( [ self.B[:, 0:index], tf.concat( [B_star_c, self.B[:, index:self.total_images]], axis=1)], axis=1)
 			
 			del Q_star_c, U_star_c, V_star_c, B_star_c, Q, U_temp, V_temp
 		del range_allowed, pri_index, sec_index

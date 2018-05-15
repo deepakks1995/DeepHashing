@@ -29,7 +29,7 @@ class Network(object):
 			i = tf.constant(0)
 			result = tf.constant(0, dtype=tf.float32)
 			condition1 = lambda i, result : tf.less(i, self._variables.total_images)
-			i, result = tf.while_loop(condition1, self.body1, [i, result])
+			# i, result = tf.while_loop(condition1, self.body1, [i, result])
 			loss1 =	self._variables.gamma*tf.norm((K.tanh(y_predict) - tensor), ord='fro' ,axis=(0,1))
 			loss2 =	self._variables.neta*tf.norm((K.tanh(y_predict)), ord='fro', axis=(0,1))	
 			loss3 =	tf.norm((K.tanh(y_predict)*K.transpose(tensor) - self._variables.kbit*self._variables.S), ord='fro', axis=(0,1))	
@@ -45,9 +45,10 @@ class Network(object):
 		condition2 = lambda j, i, result :tf.less(j, self._variables.total_images)
 
 		def body2(j, i, result):
-			theta_i_j = 0.5*tf.reshape(tf.matmul(tf.reshape(self._variables.U[:, i], [1, self._variables.kbit]) , tf.reshape(self._variables.V[:, j], [self._variables.kbit, 1]) ), [])
-			result_j = self._variables.similarity_matrix[i][j]*theta_i_j - tf.log(1 + tf.exp(theta_i_j))
-			return j+1, i, result + result_j
+			# theta_i_j = 0.5*tf.reshape(tf.matmul(tf.reshape(self._variables.U[:, i], [1, self._variables.kbit]) , tf.reshape(self._variables.V[:, j], [self._variables.kbit, 1]) ), [])
+			# result_j = self._variables.similarity_matrix[i][j]*theta_i_j - tf.log(1 + tf.exp(theta_i_j))
+			# return j+1, i, result + result_j
+			return j+1, i, 0
 
 		j, i, result = tf.while_loop(condition2, body2, loop_vars=[j, i, result])
 		return i+1, result

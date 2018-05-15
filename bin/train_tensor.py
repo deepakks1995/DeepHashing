@@ -15,7 +15,7 @@ neg_to_pos_ratio = 1
 
 
 if __name__ == '__main__':
-	data = load_data('data', positive_samples)
+	data = load_data('data/FVC2002', positive_samples)
 
 	model_vars = nt.Variables(k_bit, len(data), positive_samples)
 	prim_model = nt.Network(model_vars, 0).generate_model()
@@ -27,36 +27,36 @@ if __name__ == '__main__':
 	temp_label = np.zeros(1)			
 	for epoch in xrange(epochs):
 		print "Epoch ", epoch
-		for index in xrange(len(data)):
+		for index in xrange(2):
 			#Training on positive samples
 			for i in xrange(1, positive_samples):
 				model_vars.S = 1
 				model_vars._change_B(index, 0, index, i)
 				prim_model.fit(data[index][0], temp_label, epochs=1, verbose=0)
 				sec_model.fit(data[index][i], temp_label, epochs=1, verbose=0)	
-				xvar = tf.transpose(tf.Variable(prim_inter_model.predict(data[index][0]), dtype=tf.float32) )
-				yvar = tf.transpose(tf.Variable(sec_inter_model.predict(data[index][i]), dtype=tf.float32) )
-				model_vars.U = tf.concat([ model_vars.U[:,0:(index*positive_samples + 0)], tf.concat([xvar, model_vars.U[:,(index*positive_samples+1):len(data)*positive_samples] ], axis=1), ], axis=1)
-				model_vars.V = tf.concat([ model_vars.V[:,0:(index*positive_samples + i)], tf.concat([yvar, model_vars.V[:,(index*positive_samples+i+1):len(data)*positive_samples] ], axis=1), ], axis=1)
-				model_vars._calculate_binary([prim_model, sec_model], [index, 0, index, i])
-				del xvar
-				del yvar
-			print "Training on positive samples completed... ", index+1
-			#Training on negative samples
-			for i in xrange(1, positive_samples*neg_to_pos_ratio):
-				model_vars.S = -1
-				model_vars._change_B(index, 0, (index+i)%len(data), 0)
-				prim_model.fit(data[index][0], temp_label, epochs=1, verbose=0)
-				sec_model.fit(data[(index+i)%len(data)][0], temp_label, epochs=1, verbose=0)
-				xvar = tf.transpose(tf.Variable(prim_inter_model.predict(data[index][0]), dtype=tf.float32) )
-				yvar = tf.transpose(tf.Variable(sec_inter_model.predict(data[(index+i)%len(data)][0]), dtype=tf.float32) )
-				model_vars.U = tf.concat([ model_vars.U[:,0:(index*positive_samples + 0)], tf.concat([xvar, model_vars.U[:,(index*positive_samples+1):len(data)*positive_samples] ], axis=1), ], axis=1)
-				model_vars.V = tf.concat([ model_vars.V[:,0:( ((index+i)%len(data))*positive_samples)], tf.concat([yvar, model_vars.V[:,(((index+i)%len(data))*positive_samples+1):len(data)*positive_samples] ], axis=1), ], axis=1)
-				model_vars._calculate_binary([prim_model, sec_model], [index, 0, ((index+i)%len(data)), 0])
-				del xvar
-				del yvar
-			print "Training on negative samples completed... ", index+1
-			binary_manager._add_items(K.eval(model_vars.B[:, index*positive_samples]) )
-			gc.collect()
-			sys.stdout.flush()
-	print "Training Finished..."
+	# 			xvar = tf.transpose(tf.Variable(prim_inter_model.predict(data[index][0]), dtype=tf.float32) )
+	# 			yvar = tf.transpose(tf.Variable(sec_inter_model.predict(data[index][i]), dtype=tf.float32) )
+	# 			model_vars.U = tf.concat([ model_vars.U[:,0:(index*positive_samples + 0)], tf.concat([xvar, model_vars.U[:,(index*positive_samples+1):len(data)*positive_samples] ], axis=1), ], axis=1)
+	# 			model_vars.V = tf.concat([ model_vars.V[:,0:(index*positive_samples + i)], tf.concat([yvar, model_vars.V[:,(index*positive_samples+i+1):len(data)*positive_samples] ], axis=1), ], axis=1)
+	# 			model_vars._calculate_binary([prim_model, sec_model], [index, 0, index, i])
+	# 			del xvar
+	# 			del yvar
+	# 		print "Training on positive samples completed... ", index+1
+	# 		#Training on negative samples
+	# 		for i in xrange(1, positive_samples*neg_to_pos_ratio):
+	# 			model_vars.S = -1
+	# 			model_vars._change_B(index, 0, (index+i)%len(data), 0)
+	# 			prim_model.fit(data[index][0], temp_label, epochs=1, verbose=0)
+	# 			sec_model.fit(data[(index+i)%len(data)][0], temp_label, epochs=1, verbose=0)
+	# 			xvar = tf.transpose(tf.Variable(prim_inter_model.predict(data[index][0]), dtype=tf.float32) )
+	# 			yvar = tf.transpose(tf.Variable(sec_inter_model.predict(data[(index+i)%len(data)][0]), dtype=tf.float32) )
+	# 			model_vars.U = tf.concat([ model_vars.U[:,0:(index*positive_samples + 0)], tf.concat([xvar, model_vars.U[:,(index*positive_samples+1):len(data)*positive_samples] ], axis=1), ], axis=1)
+	# 			model_vars.V = tf.concat([ model_vars.V[:,0:( ((index+i)%len(data))*positive_samples)], tf.concat([yvar, model_vars.V[:,(((index+i)%len(data))*positive_samples+1):len(data)*positive_samples] ], axis=1), ], axis=1)
+	# 			model_vars._calculate_binary([prim_model, sec_model], [index, 0, ((index+i)%len(data)), 0])
+	# 			del xvar
+	# 			del yvar
+	# 		print "Training on negative samples completed... ", index+1
+	# 		binary_manager._add_items(K.eval(model_vars.B[:, index*positive_samples]) )
+	# 		gc.collect()
+	# 		sys.stdout.flush()
+	# print "Training Finished..."
