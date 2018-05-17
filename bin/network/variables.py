@@ -1,7 +1,7 @@
 from keras.layers import Input
 import tensorflow as tf
 import numpy as np
-import copy
+import copy, itertools
 
 class Variables(object):
  	"""docstring for Variables"""
@@ -45,18 +45,12 @@ class Variables(object):
 			self.V[itr][index] = copy.deepcopy(list[itr] )
 		del list
 
-	def _calculate_binary(self, model, variable):
+	def _calculate_binary(self, model, batch):
 
-		pri_index = variable[0]*self._samples + variable[1]
-		sec_index = variable[2]*self._samples + variable[3]
-		range_allowed 	= 	[ (pri_index+i)%self.total_images for i in xrange((int)(0.005*self.total_images) )] \
-						+ 	[(sec_index+i)%self.total_images for i in xrange((int)(0.005*self.total_images) )]
-		
-		for index in range_allowed:
-
+		for index in batch:
 			Q = -2*self.kbit*(np.dot(self.similarity_matrix.transpose(), self.U.transpose()) + np.dot(self.similarity_matrix.transpose(), self.V.transpose()))	\
 				-2*self.gamma*(self.U.transpose() + self.V.transpose())
-			
+
 			Q_star_c = Q[index].reshape(self.kbit, 1)
 			U_star_c = self.U[:, index].reshape(self.kbit, 1)
 			V_star_c = self.V[:, index].reshape(self.kbit, 1)
@@ -66,9 +60,11 @@ class Variables(object):
 			B_temp = np.concatenate( (self.B[:, 0:index], self.V[:, index+1: self.total_images]), axis=1)
 
 			B_star_c = -1*(2*B_temp.dot(U_temp.transpose().dot(U_star_c) + V_temp.transpose().dot(V_star_c)) + Q_star_c ).reshape(self.kbit)
+			
 			for itr in xrange(self.kbit):
-				self.B[itr][index] = copy.deepcopy(B_star_c[itr])
-				
+				if B_star_c[itr] > 0:
+					self.B[itr][index] = 1
+				else:
+					self.B[itr][index] = 0
 			del Q_star_c, U_star_c, V_star_c, B_star_c, Q, U_temp, V_temp, B_temp
-		del range_allowed, pri_index, sec_index
 		return 0	
