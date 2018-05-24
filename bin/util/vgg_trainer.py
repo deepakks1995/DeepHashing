@@ -53,12 +53,12 @@ def make_batch(training_images_path,iter_count,batch_size):
     full_size = len(training_images_path)
     start_idx = int(full_size/batch_size)*iter_count
     batch = []
-    for i in xrange(start_idx,start_idx+batch_size):
+    for i in range(start_idx,start_idx+batch_size):
         current_image = cv2.imread(training_images_path[i%full_size])
         current_image = current_image.reshape(224,224,3)
         current_image = current_image.astype('float64') / 255.
         batch.append(current_image)
-        for j in xrange(rotation_samples_step):
+        for j in range(rotation_samples_step):
             ccw = rng.choice([-1.,1.])
             rotation_angle = ccw*((rng.random()-1.)*5.)
             rotated_image = ndimage.rotate(current_image, rotation_angle, reshape=False, cval=255)
@@ -106,12 +106,12 @@ autoencoder_model = Model(inputs = vgg_model.input, outputs = decoder_model(vgg_
 
 autoencoder_model.compile(loss ='mean_squared_error',optimizer = Adam(0.00005))
 
-for epoch in xrange(100):
+for epoch in range(100):
     print "Epoch #",epoch
     batch_size = 16
     iteration_total = 1+int(len(training_images_path)/batch_size)
     # print 'iteration_total', iteration_total
-    for iter_count in xrange(iteration_total):
+    for iter_count in range(iteration_total):
         # print epoch,'-',iter_count,':'
         batch = make_batch(training_images_path,iter_count,batch_size)
         autoencoder_model.train_on_batch(batch, batch)
@@ -142,8 +142,8 @@ vgg_model.save_weights("models/vgg_iitk.h5")
 # print quant_info_model.predict(img)[0][:,-num_bits:]
 
 
-# # for subject in xrange(num_subjects):
-# for subject in xrange(10):
+# # for subject in range(num_subjects):
+# for subject in range(10):
 #     print "Subject #",subject+1
 #     batch = make_batch(training_images,subject)
 #     dummy = np.zeros((batch_size,x_layer_size+num_bits))
