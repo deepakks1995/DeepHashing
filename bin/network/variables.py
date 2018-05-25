@@ -1,21 +1,20 @@
 import copy
 
 import numpy as np
-import tensorflow as tf
-from keras.layers import Input
 
 
 class Variables(object):
     """docstring for Variables"""
-    def __init__(self, kbit, length, samples):
+    def __init__(self, kbit, length, samples, batch_size):
         super(Variables, self).__init__()
         self.kbit = kbit
         self._length = length
         self._samples = samples
+        self.batch_size = batch_size
         self.total_images = self._length*self._samples
         self.B, self.U, self.V, self.W = None, None, None, None
         self.similarity_matrix, self.pri_tensor, self.sec_tensor = None, None, None
-        self.gamma, self.tau, self.neta, self.S = 1, 1, 1, 1
+        self.gamma, self.tau, self.neta, self.S = 100, 10, 10, 1
         self.__init_vars()
 
     def __init_vars(self):
@@ -29,43 +28,48 @@ class Variables(object):
             for j in range(self._samples):
                 self.similarity_matrix[i][i*self._samples + j] = 1
 
-        self.pri_tensor = Input(tensor=tf.zeros(shape=self.kbit, dtype=tf.float32))
-        self.sec_tensor = Input(tensor=tf.zeros(shape=self.kbit, dtype=tf.float32))
+    def set_column_u(self, values, idx_list):
 
-    def _change_binary(self, prim_index1=0, prim_index2=0, sec_index1=0, sec_index2=0):
-        del self.pri_tensor, self.sec_tensor
-        self.pri_tensor = Input(tensor=tf.Variable(self.B[:, (prim_index1*self._samples) + prim_index2], dtype=tf.float32) )
-        self.sec_tensor = Input(tensor=tf.Variable(self.B[:, (sec_index1*self._samples) + sec_index2] ), dtype=tf.float32)
-
-    def set_column_u(self, index, list):
-        for itr in range(self.kbit):
-            self.U[itr][index] = copy.deepcopy(list[itr] )
-        del list
-
-    def set_column_v(self, index, list):
-        for itr in range(self.kbit):
-            self.V[itr][index] = copy.deepcopy(list[itr] )
-        del list
-
-    def _calculate_binary_hash(self, model, batch):
-
-        for index in batch:
-            Q = -2*self.kbit*(np.dot(self.similarity_matrix.transpose(), self.U.transpose()) + np.dot(self.similarity_matrix.transpose(), self.V.transpose())) -2*self.gamma*(self.U.transpose() + self.V.transpose())
-
-            Q_star_c = Q[index].reshape(self.kbit, 1)
-            U_star_c = self.U[:, index].reshape(self.kbit, 1)
-            V_star_c = self.V[:, index].reshape(self.kbit, 1)
-
-            U_temp = np.concatenate( (self.U[:, 0:index], self.U[:, index+1: self.total_images]), axis=1)
-            V_temp = np.concatenate( (self.V[:, 0:index], self.V[:, index+1: self.total_images]), axis=1)
-            B_temp = np.concatenate( (self.B[:, 0:index], self.V[:, index+1: self.total_images]), axis=1)
-
-            B_star_c = -1*(2*B_temp.dot(U_temp.transpose().dot(U_star_c) + V_temp.transpose().dot(V_star_c)) + Q_star_c ).reshape(self.kbit)
-
+        for it in range(self.batch_size):
             for itr in range(self.kbit):
+                self.U[itr][idx_list[it][0]] = copy.deepcopy(values[it][itr])
+
+    def set_column_v(self, values, idx_list):
+        for it in range(self.batch_size):
+            for itr in range(self.kbit):
+                self.V[itr][idx_list[it][1]] = copy.deepcopy(values[it][itr])
+
+    def set_column_w(self, values, idx_list):
+        for it in range(self.batch_size):
+            for itr in range(self.kbit):
+                self.W[itr][idx_list[it][2]] = copy.deepcopy(values[it][itr])
+
+    def _calculate_binary_hash(self):
+
+        for index in range(self.kbit):
+            Q = -2*self.kbit*(np.dot(self.similarity_matrix.transpose(), self.U.transpose()) +
+                              np.dot(self.similarity_matrix.transpose(), self.V.transpose()) +
+                              np.dot(self.similarity_matrix.transpose(), self.W.transpose())) - \
+                2*self.gamma*(self.U.transpose() + self.V.transpose() + self.W.transpose())
+
+            Q_star_c = Q[:, index].reshape(self.total_images, 1)
+            U_star_c = self.U.transpose()[:, index].reshape(self.total_images, 1)
+            V_star_c = self.V.transpose()[:, index].reshape(self.total_images, 1)
+            W_star_c = self.W.transpose()[:, index].reshape(self.total_images, 1)
+
+            U_temp = np.concatenate((self.U.transpose()[:, 0:index], self.U.transpose()[:, index+1: self.kbit]), axis=1)
+            V_temp = np.concatenate((self.V.transpose()[:, 0:index], self.V.transpose()[:, index+1: self.kbit]), axis=1)
+            W_temp = np.concatenate((self.W.transpose()[:, 0:index], self.W.transpose()[:, index+1: self.kbit]), axis=1)
+            B_temp = np.concatenate((self.B.transpose()[:, 0:index], self.B.transpose()[:, index+1: self.kbit]), axis=1)
+
+            # print (Q_star_c)
+            B_star_c = -1*(2*B_temp.dot(U_temp.transpose().dot(U_star_c) + V_temp.transpose().dot(V_star_c) +
+                                        W_temp.transpose().dot(W_star_c)) + Q_star_c).reshape(self.total_images)
+            # print (B_star_c)
+            for itr in range(self.total_images):
                 if B_star_c[itr] > 0:
-                    self.B[itr][index] = 1
+                    self.B[index][itr] = 1
                 else:
-                    self.B[itr][index] = 0
+                    self.B[index][itr] = 0
             del Q_star_c, U_star_c, V_star_c, B_star_c, Q, U_temp, V_temp, B_temp
         return 0

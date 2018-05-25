@@ -7,18 +7,25 @@ class BinaryManager(object):
         self.dictionary = {}
         self._diff_element = 0
 
-    def process_batch(self, model_vars, batch):
+    def process_batch(self, model_vars, idx_list):
         self.dictionary = {}
         self._diff_element = 0
         set1 = set()
-        for itr in batch:
-            for tuples in itertools.chain(itr[2], itr[3]):
-                index = tuples[0]*model_vars._samples + tuples[1]
-                set1.add(index)
+        for itr in range(len(idx_list)):
+            set1.add(idx_list[itr][0])
+
         for index in set1:
             self._add_items(model_vars.B[:, index])
-        print ('Different:Total ', self._diff_element),
-        print ("/", len(set1) )
+
+        print ('Different/Total ', self._diff_element, "/", len(set1))
+
+    def process_dataset(self, model_vars):
+        self.dictionary = {}
+        self._diff_element = 0
+        for itr in range(model_vars.total_images):
+            self._add_items(model_vars.B[:, itr])
+        print ()
+        print ('On Epoch Complete Different/Total ', self._diff_element, "/", model_vars.total_images)
 
     def _add_items(self, item):
         string = ''
@@ -32,4 +39,4 @@ class BinaryManager(object):
         else:
             self.dictionary[string] = 1
             self._diff_element += 1
-        # print "String ", string
+        print ("String ", string)

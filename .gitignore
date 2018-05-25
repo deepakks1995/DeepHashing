@@ -1,3 +1,4 @@
 models/
 data/
-*.pyc 
+*.pyc
+.idea/ 
