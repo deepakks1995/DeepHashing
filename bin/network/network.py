@@ -1,9 +1,10 @@
 import keras.backend as K
-import tensorflow as tf
 import numpy as np
-from keras.applications.vgg16 import VGG16
-from keras.layers import Input
-from keras.layers.core import Dense
+import tensorflow as tf
+from keras.applications.vgg19 import VGG19 as VGG16
+from .squeezenet import SqueezeNet
+from keras.layers import Input, Conv2D, Activation, GlobalAveragePooling2D, Flatten, Dropout
+from keras.layers.core import Dense, Lambda
 from keras.models import Model
 
 
@@ -18,35 +19,129 @@ class Network(object):
     def generate_model(self, input_shape=(224, 224, 3)):
 
         # VGG Model
-        vgg_binary_i = Input((self._variables.kbit, ), name="VGG_Binary_I")
-        vgg_binary_j = Input((self._variables.kbit, ), name="VGG_Binary_J")
+        vgg_binary_i = Input((self._variables.kbit,), name="VGG_Binary_I")
+        vgg_binary_j = Input((self._variables.kbit,), name="VGG_Binary_J")
         vgg_binary_k = Input((self._variables.kbit,), name="VGG_Binary_K")
         hash_j = Input((self._variables.kbit,), name="VGG_Hash_J")
         hash_k = Input((self._variables.kbit,), name="VGG_Hash_K")
-        x = VGG16(weights='imagenet', include_top=True, input_shape=input_shape)
-        x.layers.pop()
-        x.layers.pop()
-        last_layer = Dense(self._variables.kbit, activation='tanh', name='Dense11')(x.layers[-1].output)
+        x = SqueezeNet(weights='imagenet', include_top=False, input_shape=input_shape)
+        layer = Dropout(0.5, name='drop9')(x.layers[-1].output)
+        layer = Conv2D(400, (1, 1), padding='valid', name='conv10')(layer)
+        layer = Activation('relu', name='relu_conv10')(layer)
+        layer = GlobalAveragePooling2D()(layer)
+        layer = Dense(4096, activation='relu', name='fc1')(layer)
+        layer = Dense(4096, activation='relu', name='fc2')(layer)
+        # x = VGG16(weights='imagenet', include_top=True, input_shape=input_shape)
+        # x.load_weights('bin/weights/vgg_trip_fvc.h5')
+        # x.layers.pop()
+        # x.layers.pop()
+        last_layer = Dense(self._variables.kbit, activation='tanh', name='Dense11')(layer)
         model_1 = Model(inputs=[x.input, vgg_binary_i, vgg_binary_j, vgg_binary_k, hash_j, hash_k],
                         outputs=[last_layer])
         model_1.compile(optimizer="adam", loss=self.vgg_loss(vgg_binary_i, vgg_binary_j, vgg_binary_k, hash_j, hash_k))
-
+        for layer in model_1.layers:
+            layer.trainable = False
+        model_1.layers[-1].trainable = True
+        model_1.layers[-2].trainable = True
+        model_1.layers[-3].trainable = True
+        model_1.get_layer('conv10').trainable = True
         # Siamese Model
         left_input = Input(input_shape, name="Left_Siamese")
         right_input = Input(input_shape, name="Right_Siamese")
-        siamese_binary = Input((self._variables.kbit, ), name="Siamese_Binary")
+        binary_i = Input((self._variables.kbit,), name="Siamese_Binary_i")
+        binary_j = Input((self._variables.kbit,), name="Siamese_Binary_j")
+        binary_k = Input((self._variables.kbit,), name="Siamese_Binary_k")
+        hash_i = Input((self._variables.kbit,), name="Siamese_Hash_i")
 
-        convnet_old = VGG16(weights='imagenet', include_top=True, input_shape=input_shape)
-        convnet_old.layers.pop()
-        convnet_old.layers.pop()
-        dense_layer = Dense(self._variables.kbit, activation='tanh', name='Dense21')(convnet_old.layers[-1].output)
+        convnet_old = SqueezeNet(weights='imagenet', include_top=False, input_shape=input_shape)
+        convnet_layers = Dropout(0.5, name='drop9')(convnet_old.layers[-1].output)
+        convnet_layers = Conv2D(400, (1, 1), padding='valid', name='conv10')(convnet_layers)
+        convnet_layers = Activation('relu', name='relu_conv10')(convnet_layers)
+        convnet_layers = GlobalAveragePooling2D()(convnet_layers)
+        # convnet_layers = Flatten(name='flatten')(convnet_layers)
+        convnet_layers = Dense(4096, activation='relu', name='fc1')(convnet_layers)
+        convnet_layers = Dense(4096, activation='relu', name='fc2')(convnet_layers)
+        # convnet_old = VGG16(weights='imagenet', include_top=True, input_shape=input_shape)
+        # convnet_old.load_weights('bin/weights/vgg_trip_fvc.h5')
+        #
+        # convnet_old.layers.pop()
+        # # convnet_old.layers.pop()
+        dense_layer = Dense(self._variables.kbit, activation='tanh', name='Dense21')(convnet_layers)
         convnet = Model(inputs=[convnet_old.input], outputs=[dense_layer])
-        encoded_l = convnet(left_input)
-        encoded_r = convnet(right_input)
-        model_2 = Model(inputs=[left_input, right_input, siamese_binary], outputs=[encoded_l, encoded_r])
-        model_2.compile(optimizer="adam", loss=self.siamese_loss(siamese_binary))
+        for layer in convnet.layers:
+            layer.trainable = False
+        convnet.layers[-1].trainable = True
+        convnet.layers[-2].trainable = True
+        convnet.layers[-3].trainable = True
+        convnet.get_layer('conv10').trainable = True
 
+        encoded_l = convnet(left_input)
+        lambda_1 = Lambda(self.left_loss,
+                          arguments={'binary_i': binary_i, 'binary_j': binary_j,
+                                     'binary_k': binary_k, 'hash_i': hash_i})(encoded_l)
+        encoded_r = convnet(right_input)
+        lambda_2 = Lambda(self.right_loss,
+                          arguments={'binary_i': binary_i, 'binary_j': binary_j,
+                                     'binary_k': binary_k, 'hash_i': hash_i})(encoded_r)
+        model_2 = Model(inputs=[left_input, right_input, binary_i, binary_j, binary_k, hash_i],
+                        outputs=[encoded_l, encoded_r])
+        model_2.compile(optimizer="adam", loss=self.siamese_dummy)
+        model_2.summary()
         return model_1, model_2
+
+    def left_loss(self, y_predict, binary_i, binary_j, binary_k, hash_i):
+        '''
+        Loss function for left_input in siamese network
+        :param y_predict: last layer output
+        :param binary_i: binary code learned for index i
+        :param binary_j: binary code learned for index j
+        :param binary_k: binary code learned for index k
+        :param hash_i: hash code learned for index i in first network
+        :return:
+        '''
+        S_1 = tf.Variable(np.full((1, self._variables.batch_size), 1, dtype=np.float64), dtype=tf.float64)
+
+        loss1_1 = tf.norm((K.dot(K.tanh(tf.cast(y_predict, tf.float64)),
+                                 K.transpose(tf.cast(binary_i, tf.float64))) -
+                           tf.scalar_mul(self._variables.kbit,
+                                         tf.Variable(np.full((self._variables.batch_size,
+                                                              self._variables.batch_size), 1, dtype=np.float64),
+                                                     dtype=tf.float64))), axis=1)
+
+        loss2 = self._variables.neta * tf.norm((K.tanh(tf.cast(y_predict, tf.float64))), axis=1)
+        loss3 = self._variables.gamma * tf.norm((tf.cast(y_predict, tf.float64) - tf.cast(binary_j, tf.float64)),
+                                                axis=1)
+        thetha_ij = tf.scalar_mul(0.5, tf.matmul(S_1, tf.matmul(K.tanh(tf.cast(y_predict, tf.float64)),
+                                                                tf.cast(hash_i, tf.float64), transpose_b=True)))
+        loss4_1 = tf.reshape((thetha_ij - tf.log(tf.constant(1.0, dtype=tf.float64) + tf.exp(thetha_ij))), [-1])
+
+        loss4 = tf.scalar_mul((-1 * self._variables.tau), loss4_1)
+
+        return tf.cast((loss1_1 + loss2 + loss3 + loss4), tf.float32)
+
+    def right_loss(self, y_predict, binary_i, binary_j, binary_k, hash_i):
+        S_2 = tf.Variable(np.full((1, self._variables.batch_size), -1, dtype=np.float64), dtype=tf.float64)
+
+        loss1_2 = tf.norm((K.dot(K.tanh(tf.cast(y_predict, tf.float64)),
+                                 K.transpose(tf.cast(binary_i, tf.float64))) -
+                           tf.scalar_mul(self._variables.kbit,
+                                         tf.Variable(np.full((self._variables.batch_size,
+                                                              self._variables.batch_size), -1, dtype=np.float64),
+                                                     dtype=tf.float64))), axis=1)
+
+        loss2 = self._variables.neta * tf.norm((K.tanh(tf.cast(y_predict, tf.float64))), axis=1)
+        loss3 = self._variables.gamma * tf.norm((tf.cast(y_predict, tf.float64) - tf.cast(binary_k, tf.float64)),
+                                                axis=1)
+        thetha_ik = tf.scalar_mul(0.5, tf.matmul(S_2, tf.matmul(K.tanh(tf.cast(y_predict, tf.float64)),
+                                                                tf.cast(hash_i, tf.float64), transpose_b=True)))
+
+        loss4_2 = tf.reshape((thetha_ik - tf.log(tf.constant(1.0, dtype=tf.float64) + tf.exp(thetha_ik))), [-1])
+        loss4 = tf.scalar_mul((-1 * self._variables.tau), loss4_2)
+
+        return tf.cast((loss1_2 + loss2 + loss3 + loss4), tf.float32)
+
+    def siamese_dummy(self, y_true, y_predict):
+        return y_predict
 
     def vgg_loss(self, vgg_binary_i, vgg_binary_j, vgg_binary_k, hash_j, hash_k):
         S_1 = tf.Variable(np.full((1, self._variables.batch_size), 1, dtype=np.float64), dtype=tf.float64)
@@ -60,14 +155,16 @@ class Network(object):
                                                                   self._variables.batch_size), 1, dtype=np.float64),
                                                          dtype=tf.float64))), axis=1)
             loss1_2 = tf.norm((K.dot(K.tanh(tf.cast(y_predict, tf.float64)),
-                                     K.transpose(tf.cast(vgg_binary_k, tf.float64))) - tf.scalar_mul(self._variables.kbit,
+                                     K.transpose(tf.cast(vgg_binary_k, tf.float64))) -
+                               tf.scalar_mul(self._variables.kbit,
                                              tf.Variable(np.full((self._variables.batch_size,
                                                                   self._variables.batch_size), -1, dtype=np.float64),
                                                          dtype=tf.float64))), axis=1)
 
             loss2 = self._variables.neta * tf.norm((K.tanh(tf.cast(y_predict, tf.float64))), axis=1)
-            loss3 = self._variables.gamma * tf.norm((tf.cast(y_predict, tf.float64) - tf.cast(vgg_binary_i, tf.float64)),
-                                                    axis=1)
+            loss3 = self._variables.gamma * tf.norm(
+                (tf.cast(y_predict, tf.float64) - tf.cast(vgg_binary_i, tf.float64)),
+                axis=1)
 
             thetha_ij = tf.scalar_mul(0.5, tf.matmul(S_1, tf.matmul(K.tanh(tf.cast(y_predict, tf.float64)),
                                                                     tf.cast(hash_j, tf.float64), transpose_b=True)))
@@ -76,16 +173,29 @@ class Network(object):
 
             loss4_1 = tf.reshape((thetha_ij - tf.log(tf.constant(1.0, dtype=tf.float64) + tf.exp(thetha_ij))), [-1])
             loss4_2 = tf.reshape((thetha_ik - tf.log(tf.constant(1.0, dtype=tf.float64) + tf.exp(thetha_ik))), [-1])
-            loss4 = tf.scalar_mul((-1*self._variables.tau), (tf.add(loss4_1, loss4_2)))
+            loss4 = tf.scalar_mul((-1 * self._variables.tau), (tf.add(loss4_1, loss4_2)))
 
             return tf.cast((loss1_1 + loss1_2 + loss2 + loss3 + loss4), tf.float32)
+
         return loss
+
+    '''
+        Depricated Function
+    '''
 
     def siamese_loss(self, siamese_binary):
 
+        '''
+            default keras loss function
+        :param siamese_binary:
+        :return: loss
+        '''
+
         def loss(y_true, y_predict):
-            loss1_1 = tf.norm(((K.dot(K.tanh(y_predict), K.transpose(siamese_binary))) - (self._variables.kbit*y_true)),
-                              axis=1)
+            loss1_1 = tf.norm(
+                ((K.dot(K.tanh(y_predict), K.transpose(siamese_binary))) - (self._variables.kbit * y_true)),
+                axis=1)
             loss2 = self._variables.neta * tf.norm((K.tanh(y_predict)), axis=1)
             return tf.add(loss1_1, loss2)
+
         return loss

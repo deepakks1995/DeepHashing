@@ -52,7 +52,7 @@ class DataManager(object):
                     [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(5)]
 
         siamese_batch = [np.zeros((self.batch_size, 224, 224, 3)) for i in range(2)] + \
-                        [np.zeros((self.batch_size, self.model_vars.kbit))]
+                        [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(4)]
         index_list = []
 
         for itr in range(self.batch_size):
@@ -70,6 +70,9 @@ class DataManager(object):
             siamese_batch[0][itr, :, :, :] = positive_image_second
             siamese_batch[1][itr, :, :, :] = negative_image
             siamese_batch[2][itr, :] = self.model_vars.B[:, pos_index_first]
+            siamese_batch[3][itr, :] = self.model_vars.B[:, pos_index_second]
+            siamese_batch[4][itr, :] = self.model_vars.B[:, neg_index]
+            siamese_batch[5][itr, :] = self.model_vars.U[:, pos_index_first]
 
             index_list.append([pos_index_first, pos_index_second, neg_index])
             self.current_idx = (self.current_idx + 1) % self.total_subjects
