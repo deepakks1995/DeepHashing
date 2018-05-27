@@ -16,6 +16,11 @@ class Network(object):
         self._variables = variables
         self.flag = flag
 
+    '''
+        Method to implement Primary and Secondary Network
+        :param input_shape: input shape of image
+        :return: two model primary and secondary
+        '''
     def generate_model(self, input_shape=(224, 224, 3)):
 
         # VGG Model
@@ -76,21 +81,19 @@ class Network(object):
         convnet.get_layer('conv10').trainable = True
 
         encoded_l = convnet(left_input)
-        lambda_1 = Lambda(self.left_loss,
+        lambda_1 = Lambda(self.left_loss, output_shape=(self._variables.batch_size, ),
                           arguments={'binary_i': binary_i, 'binary_j': binary_j,
                                      'binary_k': binary_k, 'hash_i': hash_i})(encoded_l)
         encoded_r = convnet(right_input)
-        lambda_2 = Lambda(self.right_loss,
+        lambda_2 = Lambda(self.right_loss, output_shape=(self._variables.batch_size, ),
                           arguments={'binary_i': binary_i, 'binary_j': binary_j,
                                      'binary_k': binary_k, 'hash_i': hash_i})(encoded_r)
         model_2 = Model(inputs=[left_input, right_input, binary_i, binary_j, binary_k, hash_i],
-                        outputs=[encoded_l, encoded_r])
+                        outputs=[encoded_l, encoded_r, lambda_1, lambda_2])
         model_2.compile(optimizer="adam", loss=self.siamese_dummy)
-        model_2.summary()
         return model_1, model_2
 
-    def left_loss(self, y_predict, binary_i, binary_j, binary_k, hash_i):
-        '''
+    '''
         Loss function for left_input in siamese network
         :param y_predict: last layer output
         :param binary_i: binary code learned for index i
@@ -99,6 +102,8 @@ class Network(object):
         :param hash_i: hash code learned for index i in first network
         :return:
         '''
+    def left_loss(self, y_predict, binary_i, binary_j, binary_k, hash_i):
+
         S_1 = tf.Variable(np.full((1, self._variables.batch_size), 1, dtype=np.float64), dtype=tf.float64)
 
         loss1_1 = tf.norm((K.dot(K.tanh(tf.cast(y_predict, tf.float64)),
@@ -119,6 +124,15 @@ class Network(object):
 
         return tf.cast((loss1_1 + loss2 + loss3 + loss4), tf.float32)
 
+    '''
+        Loss function for right_input in siamese network
+        :param y_predict: last layer output
+        :param binary_i: binary code learned for index i
+        :param binary_j: binary code learned for index j
+        :param binary_k: binary code learned for index k
+        :param hash_i: hash code learned for index i in first network
+        :return:
+        '''
     def right_loss(self, y_predict, binary_i, binary_j, binary_k, hash_i):
         S_2 = tf.Variable(np.full((1, self._variables.batch_size), -1, dtype=np.float64), dtype=tf.float64)
 
@@ -140,9 +154,24 @@ class Network(object):
 
         return tf.cast((loss1_2 + loss2 + loss3 + loss4), tf.float32)
 
+    '''
+        Siamese Dummy loss function    
+        :param y_true: Fake target values which are not usable in this case
+        :param y_predict: loss calculated from previous lambda layers which should be passed from this function
+        :return: y_predict
+        '''
     def siamese_dummy(self, y_true, y_predict):
         return y_predict
 
+    '''
+        Primary Network loss function
+        :param vgg_binary_i: Binary code for image i
+        :param vgg_binary_j: Binary code for image j
+        :param vgg_binary_k: Binary code for image k
+        :param hash_j: Hash code generated for image j
+        :param hash_k: Hash code generated for image k
+        :return: 
+        '''
     def vgg_loss(self, vgg_binary_i, vgg_binary_j, vgg_binary_k, hash_j, hash_k):
         S_1 = tf.Variable(np.full((1, self._variables.batch_size), 1, dtype=np.float64), dtype=tf.float64)
         S_2 = tf.Variable(np.full((1, self._variables.batch_size), -1, dtype=np.float64), dtype=tf.float64)
@@ -180,16 +209,12 @@ class Network(object):
         return loss
 
     '''
-        Depricated Function
-    '''
-
-    def siamese_loss(self, siamese_binary):
-
-        '''
-            default keras loss function
+        Depricated function
+        Default keras loss function
         :param siamese_binary:
         :return: loss
         '''
+    def siamese_loss(self, siamese_binary):
 
         def loss(y_true, y_predict):
             loss1_1 = tf.norm(
