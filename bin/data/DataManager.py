@@ -47,16 +47,16 @@ class DataManager(object):
 
     def next_batch(self):
         self.curr_steps_per_epoch += 1
-        self.current_idx += 1
+        self.current_idx = (self.current_idx + 1) % self.total_subjects
         vgg_batch = [np.zeros((self.batch_size, 224, 224, 3))] + \
                     [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(5)]
 
         siamese_batch = [np.zeros((self.batch_size, 224, 224, 3)) for i in range(2)] + \
-                        [np.zeros((self.batch_size, self.model_vars.kbit))]
+                        [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(4)]
         index_list = []
 
         for itr in range(self.batch_size):
-            positive_image_first, pos_index_first = self.__get_pos_images(self.current_idx)
+            positive_image_first, pos_index_first = self.__get_anchor_image(self.current_idx)
             positive_image_second, pos_index_second = self.__get_pos_images(self.current_idx)
             negative_image, neg_index = self.__get_neg_images(self.current_idx)
 
@@ -70,17 +70,30 @@ class DataManager(object):
             siamese_batch[0][itr, :, :, :] = positive_image_second
             siamese_batch[1][itr, :, :, :] = negative_image
             siamese_batch[2][itr, :] = self.model_vars.B[:, pos_index_first]
+            siamese_batch[3][itr, :] = self.model_vars.B[:, pos_index_second]
+            siamese_batch[4][itr, :] = self.model_vars.B[:, neg_index]
+            siamese_batch[5][itr, :] = self.model_vars.U[:, pos_index_first]
 
             index_list.append([pos_index_first, pos_index_second, neg_index])
-            self.current_idx = (self.current_idx + 1) % self.total_subjects
 
         return vgg_batch, siamese_batch, index_list
+
+    def __get_anchor_image(self, current_idx):
+        folder_path, idx = self.__get_folder(current_idx)
+        i = 1
+        anchor_image = image.load_img(
+            os.getcwd() + "/" + self.path + "/" + folder_path + "/" + (str(idx) + "_" + str(i)))
+        anchor_image = image.img_to_array(anchor_image)
+        anchor_image = np.expand_dims(anchor_image, axis=0)
+        anchor_idx = (current_idx - 1) * self.similar_samples + (i - 1)
+        return anchor_image, anchor_idx
 
     def __get_pos_images(self, current_idx):
 
         folder_path, idx = self.__get_folder(current_idx)
         i = random.randint(1, self.similar_samples)
-        positive_image = image.load_img(os.getcwd() + "/" + self.path + "/" + folder_path + "/" + (str(idx) + "_" + str(i)))
+        positive_image = image.load_img(
+            os.getcwd() + "/" + self.path + "/" + folder_path + "/" + (str(idx) + "_" + str(i)))
         positive_image = image.img_to_array(positive_image)
         positive_image = np.expand_dims(positive_image, axis=0)
         pos_index = (current_idx-1)*self.similar_samples + (i-1)
@@ -97,7 +110,8 @@ class DataManager(object):
                 continue
             folder_path, idx = self.__get_folder(i)
 
-            negative_image = image.load_img(os.getcwd() + "/" + self.path + "/" + str(folder_path) + "/" + (str(idx) + "_1"))
+            negative_image = image.load_img(
+                os.getcwd() + "/" + self.path + "/" + str(folder_path) + "/" + (str(idx) + "_1"))
             negative_image = image.img_to_array(negative_image)
             negative_image = np.expand_dims(negative_image, axis=0)
             neg_index = (i-1)*self.similar_samples

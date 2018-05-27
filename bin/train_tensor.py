@@ -8,8 +8,8 @@ epochs = 70
 k_bit = 64
 positive_samples = 8
 neg_to_pos_ratio = 2
-batch_size = 25
-step_per_epoch = 500
+batch_size = 1
+step_per_epoch = 800
 
 
 if __name__ == '__main__':
@@ -19,7 +19,7 @@ if __name__ == '__main__':
     model_vars = nt.Variables(k_bit, data_manager.total_subjects, positive_samples, batch_size)
     vgg_model, siamese_model = nt.Network(model_vars).generate_model()
     vgg_target = [np.full((batch_size, ), 1, dtype=float)]
-    siamese_target = [np.full((batch_size, batch_size), 1, dtype=float), np.full((batch_size, batch_size), -1, dtype=float)]
+    siamese_target = [np.zeros((batch_size, )) for _ in range(4)]
     data_manager.model_vars = model_vars
     binary_manager = nt.BinaryManager()
 
@@ -32,16 +32,15 @@ if __name__ == '__main__':
             vgg_batch, siamese_batch, idx_list = data_manager.next_batch()
             var = vgg_model.train_on_batch(vgg_batch, vgg_target)
             var2 = siamese_model.train_on_batch(siamese_batch, siamese_target)
-            print (var)
+            print ('\n\n', var)
             print (var2)
             xvar = vgg_interim_model.predict_on_batch(vgg_batch)
             yvar = siamese_interim_model.predict_on_batch(siamese_batch)
-
             model_vars.set_column_u(xvar, idx_list)
             model_vars.set_column_v(yvar[0], idx_list)
             model_vars.set_column_w(yvar[1], idx_list)
-            model_vars._calculate_binary_hash()
-            binary_manager.process_batch(model_vars, idx_list)
+            model_vars.calculate_binary_hash()
+            # binary_manager.process_batch(model_vars, idx_list)
             sys.stdout.flush()
             del vgg_batch, siamese_batch, idx_list, xvar, yvar
         data_manager.on_epoch_end()

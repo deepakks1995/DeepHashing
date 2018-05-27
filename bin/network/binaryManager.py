@@ -22,15 +22,16 @@ class BinaryManager(object):
     def process_dataset(self, model_vars):
         self.dictionary = {}
         self._diff_element = 0
-        for itr in range(model_vars.total_images):
-            self._add_items(model_vars.B[:, itr])
+        for itr in range(model_vars._length):
+            index = itr*model_vars._samples
+            self._add_items(model_vars.B[:, index])
         print ()
         print ('On Epoch Complete Different/Total ', self._diff_element, "/", model_vars.total_images)
 
     def _add_items(self, item):
         string = ''
         for itr in item:
-            if itr == 0:
+            if itr <= 0:
                 string += '0'
             else:
                 string += '1'
