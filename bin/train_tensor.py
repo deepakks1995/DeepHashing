@@ -1,80 +1,49 @@
-import data as dt
-from loadImages import load_data
-import network as nt
-from keras.models import Model
-import tensorflow as tf
 import numpy as np
-import keras.backend as K
-import copy, random
-import gc, sys 
+from keras.models import Model
+import sys
+import data as dt
+import network as nt
 
-epochs = 3
+epochs = 70
 k_bit = 64
-S = 1 ##change the value of S on each image change
 positive_samples = 8
 neg_to_pos_ratio = 2
-batch_size = 2
-step_per_epoch = 3
+batch_size = 1
+step_per_epoch = 800
 
-
-def train_on_batch(data_manager, model_vars, prim_model, sec_model, prim_inter_model, sec_inter_model, binary_manager):
-	while(data_manager._has_next()):
-		batch = data_manager._next_batch(4, 8)
-		for itr in batch:
-			counter = 0
-			positive_images, negative_images, pidx_list, nidx_list = itr[0], itr[1], itr[2], itr[3]
-			
-			model_vars.S = 1
-			for i in xrange(0):
-				for j in xrange(1, len(positive_images)):
-					counter += 1
-					model_vars._change_B(pidx_list[i][0], pidx_list[i][1], pidx_list[j][0], pidx_list[j][1])
-					prim_model.fit(positive_images[i], temp_label, epochs=1, verbose=0)
-					sec_model.fit(positive_images[j], temp_label, epochs=1, verbose=0)
-					xvar = (prim_inter_model.predict(positive_images[i])).reshape(model_vars.kbit)
-					yvar = (sec_inter_model.predict(positive_images[j])).reshape(model_vars.kbit)
-					model_vars.set_column_U(pidx_list[i][0]*positive_samples + pidx_list[i][1], xvar)
-					model_vars.set_column_V(pidx_list[j][0]*positive_samples + pidx_list[j][1], yvar)
-					model_vars._calculate_binary([prim_model, sec_model], [pidx_list[i][0]*positive_samples + pidx_list[i][1], pidx_list[j][0]*positive_samples + pidx_list[j][1]])
-					del xvar, yvar
-
-			model_vars.S = -1
-			for j in xrange(len(negative_images)):
-				i = 0
-				# j = random.randint(0, len(negative_images)-1)
-				model_vars._change_B(pidx_list[i][0], pidx_list[i][1], nidx_list[j][0], nidx_list[j][1])
-				prim_model.fit(positive_images[i], temp_label, epochs=1, verbose=0)
-				sec_model.fit(negative_images[j], temp_label, epochs=1, verbose=0)
-				xvar = (prim_inter_model.predict(positive_images[i])).reshape(model_vars.kbit)
-				yvar = (sec_inter_model.predict(negative_images[j])).reshape(model_vars.kbit)
-				model_vars.set_column_U(pidx_list[i][0]*positive_samples + pidx_list[i][1], xvar)
-				model_vars.set_column_V(nidx_list[j][0]*positive_samples + nidx_list[j][1], yvar)
-				model_vars._calculate_binary([prim_model, sec_model], [pidx_list[i][0]*positive_samples + pidx_list[i][1], nidx_list[j][0]*positive_samples + nidx_list[j][1]])
-				del xvar, yvar
-
-		binary_manager.process_batch(model_vars, batch)
-		print "Batch processed completely......."
-		del batch
-	return 0
 
 if __name__ == '__main__':
-	data_manager = dt.DataManager(path='data/FVC2002', similar_samples=positive_samples, batch_size=batch_size, steps_per_epoch=step_per_epoch)
+    data_manager = dt.DataManager(path='data/FVC2002', similar_samples=positive_samples, batch_size=batch_size,
+                                  steps_per_epoch=step_per_epoch)
 
-	model_vars = nt.Variables(k_bit, data_manager.total_subjects, positive_samples)
-	prim_model = nt.Network(model_vars, 0).generate_model()
-	sec_model = nt.Network(model_vars, 1).generate_model()
-	prim_inter_model = Model(inputs=prim_model.input, outputs=prim_model.get_layer('Dense11').output)
-	sec_inter_model = Model(inputs=sec_model.input, outputs=sec_model.get_layer('Dense11').output)
-	binary_manager = nt.BinaryManager()
+    model_vars = nt.Variables(k_bit, data_manager.total_subjects, positive_samples, batch_size)
+    vgg_model, siamese_model = nt.Network(model_vars).generate_model()
+    vgg_target = [np.full((batch_size, ), 1, dtype=float)]
+    siamese_target = [np.zeros((batch_size, )) for _ in range(4)]
+    data_manager.model_vars = model_vars
+    binary_manager = nt.BinaryManager()
 
-	temp_label = np.zeros(1)			
-	for epoch in xrange(epochs):
-		print "Epoch ", epoch
-		train_on_batch(data_manager, model_vars, prim_model, sec_model, prim_inter_model, sec_inter_model, binary_manager)
-		gc.collect()
-		sys.stdout.flush()
-		print "Saving Weights.....", epoch
-		prim_model.save_weights("models/" + "pri_epochs: " + str(epoch) + ".h5")
-		sec_model.save_weights("models/" + "sec_epochs: " + str(epoch) + ".h5")
-		data_manager._on_epoch_end()
-	print "Training Finished..."
+    vgg_interim_model = Model(inputs=vgg_model.input, outputs=vgg_model.output)
+    siamese_interim_model = Model(inputs=siamese_model.input, outputs=siamese_model.output)
+
+    for epoch in range(epochs):
+        print ("Epoch ", epoch)
+        while data_manager.has_next():
+            vgg_batch, siamese_batch, idx_list = data_manager.next_batch()
+            var = vgg_model.train_on_batch(vgg_batch, vgg_target)
+            var2 = siamese_model.train_on_batch(siamese_batch, siamese_target)
+            print ('\n\n', var)
+            print (var2)
+            xvar = vgg_interim_model.predict_on_batch(vgg_batch)
+            yvar = siamese_interim_model.predict_on_batch(siamese_batch)
+            model_vars.set_column_u(xvar, idx_list)
+            model_vars.set_column_v(yvar[0], idx_list)
+            model_vars.set_column_w(yvar[1], idx_list)
+            model_vars.calculate_binary_hash()
+            # binary_manager.process_batch(model_vars, idx_list)
+            sys.stdout.flush()
+            del vgg_batch, siamese_batch, idx_list, xvar, yvar
+        data_manager.on_epoch_end()
+        binary_manager.process_dataset(model_vars)
+        vgg_model.save_weights("models/" + "VGG_epochs: " + str(epoch) + ".h5")
+        siamese_model.save_weights("models/" + "Siamese_epochs: " + str(epoch) + ".h5")
