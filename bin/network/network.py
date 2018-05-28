@@ -42,12 +42,12 @@ class Network(object):
                       outputs=[last_layer])
         model.compile(optimizer="adam", loss=self.prim_loss(prim_binary_i, prim_binary_j, hash_j, S))
 
-        for layer in model.layers:
-            layer.trainable = False
-        model.layers[-1].trainable = True
-        model.layers[-2].trainable = True
-        model.layers[-3].trainable = True
-        model.get_layer('conv10').trainable = True
+        # for layer in model.layers:
+        #     layer.trainable = False
+        # model.layers[-1].trainable = True
+        # model.layers[-2].trainable = True
+        # model.layers[-3].trainable = True
+        # model.get_layer('conv10').trainable = True
 
         return model
 

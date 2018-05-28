@@ -108,7 +108,7 @@ class DataManager(object):
         folder_path, idx = self.__get_folder(current_idx)
         i = 1
         anchor_image = image.load_img(
-            os.getcwd() + "/" + self.path + "/" + folder_path + "/" + (str(idx) + "_" + str(i)))
+            os.getcwd() + "/" + self.path + "/" + folder_path + "/" + (str(idx) + "_" + str(i)) + '.png')
         anchor_image = image.img_to_array(anchor_image)
         anchor_image = np.expand_dims(anchor_image, axis=0)
         anchor_idx = (current_idx - 1) * self.similar_samples + (i - 1)
@@ -119,7 +119,7 @@ class DataManager(object):
         folder_path, idx = self.__get_folder(current_idx)
         i = random.randint(1, self.similar_samples)
         positive_image = image.load_img(
-            os.getcwd() + "/" + self.path + "/" + folder_path + "/" + (str(idx) + "_" + str(i)))
+            os.getcwd() + "/" + self.path + "/" + folder_path + "/" + (str(idx) + "_" + str(i)) + '.png')
         positive_image = image.img_to_array(positive_image)
         positive_image = np.expand_dims(positive_image, axis=0)
         pos_index = (current_idx - 1) * self.similar_samples + (i - 1)
@@ -137,7 +137,7 @@ class DataManager(object):
             folder_path, idx = self.__get_folder(i)
 
             negative_image = image.load_img(
-                os.getcwd() + "/" + self.path + "/" + str(folder_path) + "/" + (str(idx) + "_1"))
+                os.getcwd() + "/" + self.path + "/" + str(folder_path) + "/" + (str(idx) + "_1") + '.png')
             negative_image = image.img_to_array(negative_image)
             negative_image = np.expand_dims(negative_image, axis=0)
             neg_idx = (i - 1) * self.similar_samples

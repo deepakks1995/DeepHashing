@@ -4,9 +4,9 @@ import sys
 import data as dt
 import network as nt
 
-epochs = 70
+epochs = 100
 k_bit = 64
-positive_samples = 8
+positive_samples = 80
 neg_to_pos_ratio = 2
 batch_size = 1
 step_per_epoch = 2
@@ -45,8 +45,8 @@ if __name__ == '__main__':
                 model_vars.calculate_binary_hash()
                 # binary_manager.process_batch(model_vars, idx_list)
                 sys.stdout.flush()
+            binary_manager.process_dataset(model_vars)
             del prim_batch, sec_batch, idx_list
         data_manager.on_epoch_end()
-        binary_manager.process_dataset(model_vars)
         prim_model.save_weights("models/" + "VGG_epochs: " + str(epoch) + ".h5")
         sec_model.save_weights("models/" + "Siamese_epochs: " + str(epoch) + ".h5")
