@@ -48,6 +48,43 @@ class DataManager(object):
                 return Key, idx
         raise ValueError("Current Index out of Bounds")
 
+    def test_batch(self, idx):
+
+        prim_batch = [[np.zeros((self.batch_size, 224, 224, 3))] +
+                      [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(3)] +
+                      [np.zeros(self.batch_size)]] + \
+                     [[np.zeros((self.batch_size, 224, 224, 3))] +
+                      [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(3)] +
+                      [np.zeros(self.batch_size)]]
+
+        sec_batch = [[np.zeros((self.batch_size, 224, 224, 3))] +
+                     [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(3)] +
+                     [np.zeros(self.batch_size)]] + \
+                    [[np.zeros((self.batch_size, 224, 224, 3))] +
+                     [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(3)] +
+                     [np.zeros(self.batch_size)]]
+
+        for itr in range(self.batch_size):
+            anchor_image = image.load_img('data/FVC2002/Db1/' + str(idx[0]) + '_1.png')
+            anchor_image = image.img_to_array(anchor_image)
+            anchor_image = np.expand_dims(anchor_image, axis=0)
+            positive_image = image.load_img('data/FVC2002/Db1/' + str(idx[0]) + '_' + str(idx[1]) + '.png')
+            positive_image = image.img_to_array(positive_image)
+            positive_image = np.expand_dims(positive_image, axis=0)
+            negative_image = image.load_img('data/FVC2002/Db1/' + str(idx[2]) + '_1.png')
+            negative_image = image.img_to_array(negative_image)
+            negative_image = np.expand_dims(negative_image, axis=0)
+
+            prim_batch[0][0][itr, :, :, :] = anchor_image
+
+            prim_batch[1][0][itr, :, :, :] = anchor_image
+
+            sec_batch[0][0][itr, :, :, :] = positive_image
+
+            sec_batch[0][0][itr, :, :, :] = negative_image
+
+        return prim_batch, sec_batch
+
     def next_batch(self):
         self.curr_steps_per_epoch += 1
         self.current_idx = (self.current_idx + 1) % self.total_subjects
@@ -117,7 +154,7 @@ class DataManager(object):
     def __get_pos_images(self, current_idx):
 
         folder_path, idx = self.__get_folder(current_idx)
-        i = random.randint(1, self.similar_samples)
+        i = random.randint(2, self.similar_samples)
         positive_image = image.load_img(
             os.getcwd() + "/" + self.path + "/" + folder_path + "/" + (str(idx) + "_" + str(i)) + '.png')
         positive_image = image.img_to_array(positive_image)

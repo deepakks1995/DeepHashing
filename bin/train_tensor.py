@@ -9,7 +9,7 @@ k_bit = 64
 positive_samples = 80
 neg_to_pos_ratio = 2
 batch_size = 1
-step_per_epoch = 2
+step_per_epoch = 500
 
 
 if __name__ == '__main__':
@@ -28,6 +28,8 @@ if __name__ == '__main__':
     prim_interim_model = Model(inputs=prim_model.input, outputs=prim_model.output)
     sec_interim_model = Model(inputs=sec_model.input, outputs=sec_model.output)
 
+    max_diff = 0
+
     for epoch in range(epochs):
         print ("Epoch ", epoch)
         while data_manager.has_next():
@@ -35,18 +37,21 @@ if __name__ == '__main__':
             for i in range(2):
                 var = prim_model.train_on_batch(prim_batch[i], vgg_target)
                 var1 = sec_model.train_on_batch(sec_batch[i], siamese_target)
-                print ('\n\nTraining', i, var)
-                print (var1)
-
-                xvar = prim_interim_model.predict_on_batch(prim_batch[i])
-                yvar = sec_interim_model.predict_on_batch(sec_batch[i])
+                print ('\nTraining', i, var, var1, data_manager.curr_steps_per_epoch)
+                xvar = prim_model.predict_on_batch(prim_batch[i])
+                yvar = sec_model.predict_on_batch(sec_batch[i])
                 model_vars.set_column_u(xvar, idx_list)
                 model_vars.set_column_v(yvar, idx_list)
                 model_vars.calculate_binary_hash()
                 # binary_manager.process_batch(model_vars, idx_list)
                 sys.stdout.flush()
-            binary_manager.process_dataset(model_vars)
+            diff = binary_manager.process_dataset(model_vars)
+            if diff > max_diff or diff > 65:
+                max_diff = diff
+                prim_model.save_weights("newmodels/max/" + "VGG_epochs: " + str(epoch) + '_max_' + str(diff) + ".h5")
+                sec_model.save_weights("newmodels/max/" + "Siamese_epochs: " + str(epoch) + '_max_' + str(diff) + ".h5")
             del prim_batch, sec_batch, idx_list
         data_manager.on_epoch_end()
-        prim_model.save_weights("models/" + "VGG_epochs: " + str(epoch) + ".h5")
-        sec_model.save_weights("models/" + "Siamese_epochs: " + str(epoch) + ".h5")
+        prim_model.save_weights("newmodels/" + "VGG_epochs: " + str(epoch) + ".h5")
+        sec_model.save_weights("newmodels/" + "Siamese_epochs: " + str(epoch) + ".h5")
+        max_diff = 0

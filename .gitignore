@@ -2,3 +2,4 @@ train_data/
 models/
 .idea/
 *.pyc 
+weights/

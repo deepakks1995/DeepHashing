@@ -25,6 +25,7 @@ class BinaryManager(object):
             self._add_items(model_vars.B[:, index])
         print ()
         print ('On Epoch Complete Different/Total ', self._diff_element, "/", model_vars.total_images)
+        return self._diff_element
 
     def _add_items(self, item):
         string = ''
