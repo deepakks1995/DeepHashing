@@ -50,19 +50,11 @@ class DataManager(object):
 
     def test_batch(self, idx):
 
-        prim_batch = [[np.zeros((self.batch_size, 224, 224, 3))] +
-                      [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(3)] +
-                      [np.zeros(self.batch_size)]] + \
-                     [[np.zeros((self.batch_size, 224, 224, 3))] +
-                      [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(3)] +
-                      [np.zeros(self.batch_size)]]
+        prim_batch = [[np.zeros((self.batch_size, 224, 224, 3))] ] + \
+                     [[np.zeros((self.batch_size, 224, 224, 3))]]
 
-        sec_batch = [[np.zeros((self.batch_size, 224, 224, 3))] +
-                     [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(3)] +
-                     [np.zeros(self.batch_size)]] + \
-                    [[np.zeros((self.batch_size, 224, 224, 3))] +
-                     [np.zeros((self.batch_size, self.model_vars.kbit)) for _ in range(3)] +
-                     [np.zeros(self.batch_size)]]
+        sec_batch = [[np.zeros((self.batch_size, 224, 224, 3))] ] + \
+                    [[np.zeros((self.batch_size, 224, 224, 3))] ]
 
         for itr in range(self.batch_size):
             anchor_image = image.load_img('data/FVC2002/Db1/' + str(idx[0]) + '_1.png')

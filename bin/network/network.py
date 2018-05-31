@@ -38,9 +38,9 @@ class Network(object):
         layer = Dense(4096, activation='relu', name='fc2')(layer)
         last_layer = Dense(self._variables.kbit, activation='tanh', name='Dense11')(layer)
 
-        model = Model(inputs=[x.input, prim_binary_i, prim_binary_j, hash_j, S],
-                      outputs=[last_layer])
-        model.compile(optimizer="adam", loss=self.prim_loss(prim_binary_i, prim_binary_j, hash_j, S))
+        # model = Model(inputs=[x.input, prim_binary_i, prim_binary_j, hash_j, S], outputs=[last_layer])
+        model = Model(inputs=[x.input], outputs=[last_layer])
+        # model.compile(optimizer="adam", loss=self.prim_loss(prim_binary_i, prim_binary_j, hash_j, S))
 
         # for layer in model.layers:
         #     layer.trainable = False

@@ -39,4 +39,4 @@ class BinaryManager(object):
         else:
             self.dictionary[string] = 1
             self._diff_element += 1
-        # print ("String ", string)
+        print ("String ", string)

@@ -48,10 +48,10 @@ if __name__ == '__main__':
             diff = binary_manager.process_dataset(model_vars)
             if diff > max_diff or diff > 65:
                 max_diff = diff
-                prim_model.save_weights("newmodels/max/" + "VGG_epochs: " + str(epoch) + '_max_' + str(diff) + ".h5")
-                sec_model.save_weights("newmodels/max/" + "Siamese_epochs: " + str(epoch) + '_max_' + str(diff) + ".h5")
+                prim_model.save_weights("newmodels/max/" + "1VGG_epochs: " + str(epoch) + '_max_' + str(diff) + ".h5")
+                sec_model.save_weights("newmodels/max/" + "1Siamese_epochs: " + str(epoch) + '_max_' + str(diff) + ".h5")
             del prim_batch, sec_batch, idx_list
         data_manager.on_epoch_end()
-        prim_model.save_weights("newmodels/" + "VGG_epochs: " + str(epoch) + ".h5")
-        sec_model.save_weights("newmodels/" + "Siamese_epochs: " + str(epoch) + ".h5")
+        prim_model.save_weights("newmodels/" + "1VGG_epochs: " + str(epoch) + ".h5")
+        sec_model.save_weights("newmodels/" + "1Siamese_epochs: " + str(epoch) + ".h5")
         max_diff = 0
